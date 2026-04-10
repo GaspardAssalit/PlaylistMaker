@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Playlistify</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<style>
+  :root { --green:#1DB954; --green-dark:#17a349; --black:#0a0a0a; --surface:#111; --surface2:#1a1a1a; --border:#2a2a2a; --text:#f0f0f0; --muted:#666; }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--black); color:var(--text); font-family:'Space Mono',monospace; min-height:100vh; overflow-x:hidden; }
+  .noise { position:fixed; inset:0; pointer-events:none; z-index:0; opacity:0.4; background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E"); }
+  .wrap { position:relative; z-index:1; max-width:760px; margin:0 auto; padding:40px 20px; }
+  header { margin-bottom:40px; }
+  .logo { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+  .logo-dot { width:36px; height:36px; background:var(--green); border-radius:50%; display:flex; align-items:center; justify-content:center; }
+  .logo-dot svg { width:20px; height:20px; fill:#000; }
+  h1 { font-family:'Syne',sans-serif; font-size:clamp(1.8rem,5vw,3rem); font-weight:800; line-height:1.1; }
+  h1 em { color:var(--green); font-style:normal; }
+  .sub { color:var(--muted); font-size:0.75rem; margin-top:6px; letter-spacing:.05em; }
+
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:24px; margin-bottom:18px; }
+  .card-title { font-family:'Syne',sans-serif; font-size:0.8rem; font-weight:700; text-transform:uppercase; letter-spacing:.08em; color:var(--muted); margin-bottom:14px; }
+
+  .row { display:flex; gap:10px; flex-wrap:wrap; }
+  input[type=text] { flex:1; min-width:0; background:var(--surface2); border:1px solid var(--border); border-radius:8px; color:var(--text); font-family:'Space Mono',monospace; font-size:0.8rem; padding:11px 14px; outline:none; transition:border-color .2s; }
+  input[type=text]:focus { border-color:var(--green); }
+  input[type=text]::placeholder { color:var(--muted); }
+
+  .btn { font-family:'Space Mono',monospace; font-size:0.75rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:11px 18px; border-radius:8px; border:none; cursor:pointer; transition:all .2s; white-space:nowrap; }
+  .btn-g { background:var(--green); color:#000; }
+  .btn-g:hover { background:var(--green-dark); }
+  .btn-o { background:transparent; color:var(--green); border:1px solid var(--green); }
+  .btn-o:hover { background:var(--green); color:#000; }
+  .btn:disabled { opacity:.4; cursor:not-allowed; }
+
+  .msg { display:flex; align-items:center; gap:8px; padding:9px 13px; border-radius:8px; font-size:0.7rem; margin-top:10px; }
+  .msg.ok { background:rgba(29,185,84,.08); border:1px solid rgba(29,185,84,.2); color:var(--green); }
+  .msg.err { background:rgba(255,80,80,.08); border:1px solid rgba(255,80,80,.2); color:#f88; }
+  .msg.load { background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--muted); }
+  .dot { width:7px; height:7px; border-radius:50%; background:currentColor; flex-shrink:0; }
+  .pulse { animation:pulse 1.4s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ARTIST CARDS */
+  .a-card { background:var(--surface2); border:1px solid var(--border); border-radius:10px; margin-bottom:8px; overflow:hidden; animation:pop .2s ease; }
+  @keyframes pop { from{opacity:0;transform:translateY(-4px)} to{opacity:1;transform:none} }
+  .a-top { display:flex; align-items:center; gap:10px; padding:10px 12px; }
+  .a-img { width:38px; height:38px; border-radius:50%; object-fit:cover; background:var(--surface); flex-shrink:0; }
+  .a-name { font-size:0.8rem; font-weight:700; flex:1; min-width:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .src-btn { font-family:'Space Mono',monospace; font-size:0.62rem; background:rgba(29,185,84,.1); border:1px solid rgba(29,185,84,.25); color:var(--green); border-radius:6px; padding:5px 8px; cursor:pointer; white-space:nowrap; flex-shrink:0; transition:all .15s; }
+  .src-btn:hover, .src-btn.on { background:rgba(29,185,84,.22); border-color:var(--green); }
+  .del-btn { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1.1rem; padding:4px; line-height:1; transition:color .15s; }
+  .del-btn:hover { color:#f88; }
+
+  .w-row { display:flex; align-items:center; gap:10px; padding:0 12px 10px; }
+  .w-lbl { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; white-space:nowrap; }
+  .w-row input[type=range] { flex:1; accent-color:var(--green); cursor:pointer; }
+  .w-val { font-size:0.72rem; color:var(--green); font-weight:700; min-width:55px; text-align:right; }
+
+  .picker { border-top:1px solid var(--border); padding:12px; display:none; }
+  .picker.open { display:block; }
+  .p-lbl { font-size:0.62rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:8px; }
+  .p-grid { display:flex; flex-wrap:wrap; gap:6px; }
+  .al-opt { display:flex; align-items:center; gap:6px; background:var(--surface); border:1px solid var(--border); border-radius:8px; padding:6px 10px; cursor:pointer; font-size:0.67rem; max-width:200px; transition:all .15s; user-select:none; }
+  .al-opt:hover { border-color:rgba(29,185,84,.4); }
+  .al-opt.on { border-color:var(--green); background:rgba(29,185,84,.1); color:var(--green); }
+  .al-opt img { width:26px; height:26px; border-radius:3px; flex-shrink:0; object-fit:cover; }
+  .al-name { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; min-width:0; }
+  .chk { flex-shrink:0; opacity:0; font-size:0.7rem; }
+  .al-opt.on .chk { opacity:1; }
+  .p-loading { color:var(--muted); font-size:0.7rem; }
+
+  .empty { background:var(--surface2); border:1px dashed var(--border); border-radius:10px; padding:18px; text-align:center; color:var(--muted); font-size:0.75rem; margin-bottom:8px; }
+
+  /* SETTINGS */
+  .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+  @media(max-width:480px){ .grid2{grid-template-columns:1fr} }
+  .field label { display:block; font-size:0.68rem; color:var(--muted); text-transform:uppercase; letter-spacing:.06em; margin-bottom:6px; }
+  .rng { display:flex; align-items:center; gap:10px; }
+  input[type=range] { flex:1; accent-color:var(--green); cursor:pointer; }
+  .rval { font-size:0.78rem; color:var(--green); min-width:42px; text-align:right; }
+
+  /* TRACKS */
+  .t-section { display:none; margin-top:22px; }
+  .t-list { list-style:none; }
+  .t-item { display:flex; align-items:center; gap:11px; padding:9px 0; border-bottom:1px solid var(--border); animation:fadeUp .3s ease; }
+  .t-item:last-child { border-bottom:none; }
+  @keyframes fadeUp { from{opacity:0;transform:translateY(4px)} to{opacity:1;transform:none} }
+  .t-num { color:var(--muted); font-size:0.68rem; min-width:18px; text-align:right; }
+  .t-img { width:38px; height:38px; border-radius:4px; object-fit:cover; background:var(--surface2); flex-shrink:0; }
+  .t-info { flex:1; min-width:0; }
+  .t-name { font-size:0.78rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .t-art { font-size:0.68rem; color:var(--muted); margin-top:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .t-dur { font-size:0.67rem; color:var(--muted); flex-shrink:0; min-width:30px; text-align:right; }
+  .t-del { background:none; border:none; color:var(--muted); cursor:pointer; font-size:1rem; padding:4px; transition:color .15s; flex-shrink:0; }
+  .t-del:hover { color:#f88; }
+
+  /* RESULT */
+  .result { background:var(--surface); border:1px solid rgba(29,185,84,.3); border-radius:12px; padding:24px; display:none; text-align:center; margin-bottom:18px; }
+  .r-icon { width:54px; height:54px; background:var(--green); border-radius:50%; display:flex; align-items:center; justify-content:center; margin:0 auto 14px; font-size:1.4rem; }
+  .r-title { font-family:'Syne',sans-serif; font-size:1.1rem; font-weight:700; margin-bottom:4px; }
+  .r-sub { color:var(--muted); font-size:0.72rem; margin-bottom:18px; }
+  .sp-btn { display:inline-flex; align-items:center; gap:8px; background:var(--green); color:#000; text-decoration:none; font-family:'Space Mono',monospace; font-size:0.75rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase; padding:11px 22px; border-radius:50px; transition:background .2s; }
+  .sp-btn:hover { background:var(--green-dark); }
+  .hint { font-size:0.67rem; color:var(--muted); margin-top:10px; line-height:1.7; }
+  .hint a { color:var(--green); cursor:pointer; }
+
+  footer { text-align:center; color:var(--muted); font-size:0.63rem; margin-top:36px; line-height:1.9; }
+</style>
+</head>
+<body>
+<div class="noise"></div>
+<div class="wrap">
+
+  <header>
+    <div class="logo">
+      <div class="logo-dot">
+        <svg viewBox="0 0 24 24"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+      </div>
+      <span style="font-family:'Syne',sans-serif;font-weight:700;letter-spacing:.05em;">PLAYLISTIFY</span>
+    </div>
+    <h1>Génère ta <em>playlist</em> parfaite</h1>
+    <p class="sub">// PROPULSÉ PAR SPOTIFY API</p>
+  </header>
+
+  <!-- AUTH -->
+  <div class="card" id="authCard">
+    <p class="card-title">01 — Connexion Spotify</p>
+    <p style="font-size:0.73rem;color:var(--muted);margin-bottom:14px;line-height:1.7;">
+      Tu as besoin d'un <strong style="color:var(--text)">Client ID</strong> Spotify gratuit.<br>
+      Créé une app sur <a href="https://developer.spotify.com/dashboard" target="_blank" style="color:var(--green)">developer.spotify.com</a> et ajoute l'URL de cette page comme Redirect URI.
+    </p>
+    <div class="row">
+      <input type="text" id="clientId" placeholder="Client ID Spotify..." />
+      <button class="btn btn-g" onclick="startAuth()">Connecter</button>
+    </div>
+    <div id="authMsg"></div>
+  </div>
+
+  <!-- MAIN -->
+  <div class="card" id="mainCard" style="display:none;">
+
+    <div style="margin-bottom:22px;">
+      <p class="card-title">02 — Tes artistes</p>
+      <div id="artistList"></div>
+      <div class="row" style="margin-bottom:8px;">
+        <input type="text" id="artistInput" placeholder="Ex: Laylow, PNL, Daft Punk..." onkeydown="if(event.key==='Enter')addArtist()" />
+        <button class="btn btn-o" onclick="addArtist()">+ Ajouter</button>
+      </div>
+      <div id="artistMsg"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="field">
+        <label>Durée cible</label>
+        <div class="rng">
+          <input type="range" id="dur" min="10" max="180" value="45" step="5" oninput="updDur()">
+          <span class="rval" id="durVal">45 min</span>
+        </div>
+      </div>
+      <div class="field">
+        <label>Nom de la playlist</label>
+        <input type="text" id="plName" placeholder="Ma playlist" style="padding:9px 12px;" />
+      </div>
+    </div>
+
+    <button class="btn btn-g" id="genBtn" onclick="generate()" style="width:100%;" disabled>⚡ Générer la playlist</button>
+    <div id="genMsg"></div>
+
+    <div class="t-section" id="tSection">
+      <p class="card-title" style="margin-top:20px;">
+        Titres — <span id="durTotal" style="color:var(--green);font-weight:400;"></span>
+      </p>
+      <ul class="t-list" id="tList"></ul>
+      <div class="row" style="margin-top:14px;">
+        <button class="btn btn-g" id="saveBtn" onclick="savePlaylist()">💾 Sauvegarder</button>
+        <button class="btn btn-o" onclick="generate()">🔀 Regénérer</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESULT -->
+  <div class="result" id="resultCard">
+    <div class="r-icon">🎧</div>
+    <div class="r-title">Playlist créée !</div>
+    <p class="r-sub">Ajoutée à ton compte Spotify</p>
+    <a id="spLink" href="#" target="_blank" class="sp-btn">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+      Ouvrir dans Spotify
+    </a>
+    <p class="hint"><a onclick="reset()">← Créer une autre playlist</a></p>
+  </div>
+
+  <footer>PLAYLISTIFY · SPOTIFY WEB API · Aucune donnée stockée</footer>
+</div>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+let token = null, uid = null, cid = '';
+// artist: { id, name, img, albums:null|[], sel:Set, open:bool, w:1-5 }
+let artists = [], tracks = [];
+
+// ============================================================
+// AUTH — PKCE
+// ============================================================
+function rnd(n) {
+  const c = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const a = new Uint8Array(n); crypto.getRandomValues(a);
+  return [...a].map(x => c[x % c.length]).join('');
+}
+async function challenge(v) {
+  const d = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(v));
+  return btoa(String.fromCharCode(...new Uint8Array(d))).replace(/\+/g,'-').replace(/\//g,'_').replace(/=/g,'');
+}
+
+async function startAuth() {
+  cid = document.getElementById('clientId').value.trim();
+  if (!cid) return msg('authMsg','err','Entre ton Client ID.');
+  const uri = location.href.split('?')[0].split('#')[0];
+  const v = rnd(64), ch = await challenge(v), st = rnd(16);
+  ss('v',v); ss('st',st); ss('cid',cid); ss('uri',uri);
+  const p = new URLSearchParams({ client_id:cid, response_type:'code', redirect_uri:uri,
+    scope:'playlist-modify-public playlist-modify-private user-read-private user-read-email', state:st,
+    code_challenge_method:'S256', code_challenge:ch });
+  location.href = 'https://accounts.spotify.com/authorize?' + p;
+}
+
+async function handleCode() {
+  const p = new URLSearchParams(location.search);
+  const code = p.get('code'), st = p.get('state'), err = p.get('error');
+  if (err) { msg('authMsg','err','Accès refusé : ' + err); return; }
+  if (!code || st !== gs('st')) return;
+  history.replaceState({}, '', location.pathname);
+  cid = gs('cid');
+  msg('authMsg','load','Connexion...', true);
+  try {
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({ grant_type:'authorization_code', code, redirect_uri:gs('uri'), client_id:cid, code_verifier:gs('v') })
+    });
+    const d = await r.json();
+    if (d.error) throw new Error(d.error_description || d.error);
+    token = d.access_token;
+    ss('tok', token);
+    ss('exp', Date.now() + d.expires_in * 1000);
+    ss('ref', d.refresh_token || '');
+    await boot();
+  } catch(e) { msg('authMsg','err','Erreur : ' + e.message); }
+}
+
+async function trySession() {
+  const t = gs('tok'), exp = +gs('exp');
+  if (t && Date.now() < exp - 30000) { token = t; cid = gs('cid'); await boot(); return true; }
+  if (gs('ref')) { const ok = await doRefresh(); if (ok) { await boot(); return true; } }
+  return false;
+}
+
+async function doRefresh() {
+  try {
+    const r = await fetch('https://accounts.spotify.com/api/token', {
+      method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'},
+      body: new URLSearchParams({ grant_type:'refresh_token', refresh_token:gs('ref'), client_id:cid || gs('cid') })
+    });
+    const d = await r.json();
+    if (!d.access_token) return false;
+    token = d.access_token;
+    ss('tok', token); ss('exp', Date.now() + d.expires_in * 1000);
+    return true;
+  } catch(e) { return false; }
+}
+
+async function ensureToken() {
+  if (Date.now() > +gs('exp') - 30000) await doRefresh();
+}
+
+async function boot() {
+  msg('authMsg','load','Chargement du profil...',true);
+  try {
+    const d = await api('https://api.spotify.com/v1/me');
+    uid = d.id;
+    cid = gs('cid');
+    msg('authMsg','ok','✓ Connecté : ' + (d.display_name || d.id));
+    document.getElementById('mainCard').style.display = 'block';
+    renderArtists();
+  } catch(e) { msg('authMsg','err','Erreur de connexion.'); }
+}
+
+// ============================================================
+// ARTISTS
+// ============================================================
+async function addArtist() {
+  const inp = document.getElementById('artistInput');
+  const name = inp.value.trim();
+  if (!name) return;
+  if (artists.length >= 10) return msg('artistMsg','err','Maximum 10 artistes.');
+  msg('artistMsg','load',`Recherche "${name}"...`,true);
+  try {
+    const d = await api(`https://api.spotify.com/v1/search?q=${encodeURIComponent(name)}&type=artist&limit=1`);
+    const a = d.artists?.items?.[0];
+    if (!a) return msg('artistMsg','err',`"${name}" introuvable.`);
+    if (artists.find(x => x.id === a.id)) return msg('artistMsg','err','Déjà ajouté.');
+    artists.push({ id:a.id, name:a.name, img:a.images?.[1]?.url||a.images?.[0]?.url||'', albums:null, sel:new Set(['top']), open:false, w:3 });
+    inp.value = '';
+    clr('artistMsg');
+    renderArtists();
+    updGenBtn();
+  } catch(e) { msg('artistMsg','err','Erreur API.'); }
+}
+
+async function loadAlbums(id) {
+  const a = artists.find(x => x.id === id);
+  if (!a || a._loading) return;
+  if (a.albums !== null) return; // already loaded
+  a._loading = true;
+  renderArtists();
+  try {
+    await ensureToken();
+    const d = await api(`https://api.spotify.com/v1/artists/${id}/albums?include_groups=album,single&limit=50`);
+    const seen = new Set();
+    a.albums = (d.items||[]).filter(al => {
+      const k = al.name.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k); return true;
+    });
+  } catch(e) {
+    console.error('loadAlbums error:', e);
+    a.albums = [];
+    a._err = e.message;
+  }
+  a._loading = false;
+  renderArtists();
+}
+
+function removeArtist(id) { artists = artists.filter(x => x.id !== id); renderArtists(); updGenBtn(); }
+
+async function toggleOpen(id) {
+  const a = artists.find(x => x.id === id);
+  if (!a) return;
+  const opening = !a.open;
+  artists.forEach(x => x.open = false);
+  a.open = opening;
+  renderArtists();
+  if (opening && a.albums === null) await loadAlbums(id);
+}
+
+function toggleAlbum(id, alId) {
+  const a = artists.find(x => x.id === id);
+  if (!a) return;
+  if (alId === 'all') {
+    a.sel = new Set(['all', ...(a.albums||[]).map(al=>al.id)]);
+  } else if (alId === 'top') {
+    a.sel = new Set(['top']);
+  } else {
+    a.sel.delete('top'); a.sel.delete('all');
+    if (a.sel.has(alId)) { a.sel.delete(alId); if (!a.sel.size) a.sel.add('top'); }
+    else a.sel.add(alId);
+  }
+  renderArtists();
+}
+
+function setW(id, v) { const a = artists.find(x=>x.id===id); if(a){a.w=+v;} renderArtists(); }
+
+function srcLabel(a) {
+  if (a.sel.has('top')) return '⭐ Top tracks';
+  if (a.sel.has('all')) return '🎵 Tous les titres';
+  const n = [...a.sel].filter(x=>x!=='top'&&x!=='all').length;
+  if (n===1) { const al = a.albums?.find(x=>x.id===[...a.sel][0]); return al?.name||'1 album'; }
+  return n + ' albums';
+}
+function stars(w) { return '★'.repeat(w)+'☆'.repeat(5-w); }
+
+function renderArtists() {
+  const c = document.getElementById('artistList');
+  if (!artists.length) { c.innerHTML='<div class="empty">Ajoute jusqu\'à 10 artistes ci-dessous...</div>'; return; }
+  c.innerHTML = '';
+  artists.forEach(a => {
+    let pickerHTML = '';
+    if (a.open) {
+      let inner = '';
+      if (a._loading || a.albums === null) {
+        inner = '<div class="p-loading">Chargement des albums...</div>';
+      } else {
+        const topOn = a.sel.has('top') ? 'on' : '';
+        const allOn = a.sel.has('all') ? 'on' : '';
+        inner = `
+          <div class="al-opt ${topOn}" onclick="toggleAlbum('${a.id}','top')">
+            <span style="font-size:.9rem">⭐</span><span class="al-name">Top tracks</span><span class="chk">✓</span>
+          </div>
+          <div class="al-opt ${allOn}" onclick="toggleAlbum('${a.id}','all')">
+            <span style="font-size:.9rem">🎵</span><span class="al-name">Tous les titres</span><span class="chk">✓</span>
+          </div>`;
+        if (a.albums && a.albums.length === 0) {
+          inner += `<div class="p-loading" style="margin-top:6px;color:#f88;">${a._err ? 'Erreur : '+a._err : 'Aucun album trouvé.'}</div>`;
+        } else {
+          (a.albums||[]).forEach(al => {
+            const img = al.images?.[2]?.url||al.images?.[0]?.url||'';
+            const on = a.sel.has(al.id)?'on':'';
+            inner += `<div class="al-opt ${on}" onclick="toggleAlbum('${a.id}','${al.id}')">
+              ${img?`<img src="${img}" alt="">`:''}
+              <span class="al-name">${x(al.name)}</span><span class="chk">✓</span>
+            </div>`;
+          });
+        }
+      }
+      pickerHTML = `<div class="picker open"><div class="p-lbl">Source (sélection multiple) :</div><div class="p-grid">${inner}</div></div>`;
+    }
+
+    const el = document.createElement('div');
+    el.className = 'a-card';
+    el.innerHTML = `
+      <div class="a-top">
+        <img class="a-img" src="${a.img}" alt="" onerror="this.style.background='var(--surface)'">
+        <span class="a-name">${x(a.name)}</span>
+        <button class="src-btn${a.open?' on':''}" onclick="toggleOpen('${a.id}')">${x(srcLabel(a))} ▾</button>
+        <button class="del-btn" onclick="removeArtist('${a.id}')">×</button>
+      </div>
+      <div class="w-row">
+        <span class="w-lbl">Présence</span>
+        <input type="range" min="1" max="5" value="${a.w}" oninput="setW('${a.id}',this.value)">
+        <span class="w-val">${stars(a.w)}</span>
+      </div>
+      ${pickerHTML}`;
+    c.appendChild(el);
+  });
+}
+
+function updGenBtn() { document.getElementById('genBtn').disabled = !artists.length; }
+
+// ============================================================
+// GENERATE
+// ============================================================
+async function generate() {
+  if (!artists.length) return;
+  await ensureToken();
+  const targetMs = +document.getElementById('dur').value * 60000;
+  msg('genMsg','load','Récupération des titres...',true);
+  document.getElementById('tSection').style.display = 'none';
+  document.getElementById('genBtn').disabled = true;
+
+  try {
+    const totalW = artists.reduce((s,a)=>s+a.w,0);
+    const pools = [];
+
+    for (const a of artists) {
+      let pool = [];
+      const sel = [...a.sel];
+
+      if (sel.includes('top')) {
+        // Use search to get artist's popular tracks (avoids top-tracks permission issues)
+        const d = await api(`https://api.spotify.com/v1/artists/${a.id}/albums?include_groups=album,single&market=FR&limit=5`);
+        const topAlbums = (d.items||[]).slice(0,3);
+        for (const al of topAlbums) {
+          const ad = await api(`https://api.spotify.com/v1/albums/${al.id}/tracks?limit=50`);
+          const items = (ad.items||[]).map(t=>({...t, duration_ms:t.duration_ms||0, album:{images:al.images||[],name:al.name}, uri:t.uri}));
+          pool.push(...items);
+        }
+
+      } else if (sel.includes('all')) {
+        // load albums if needed
+        if (!a.albums || a.albums.length === 0) await loadAlbums(a.id);
+        for (const al of (a.albums||[])) {
+          const d = await api(`https://api.spotify.com/v1/albums/${al.id}/tracks?limit=50`);
+          const items = (d.items||[]).map(t=>({...t, duration_ms: t.duration_ms||0, album:{images:al.images||[],name:al.name}, uri:t.uri}));
+          pool.push(...items);
+        }
+
+      } else {
+        // specific albums
+        if (!a.albums) await loadAlbums(a.id);
+        for (const alId of sel.filter(s=>s!=='top'&&s!=='all')) {
+          const al = (a.albums||[]).find(x=>x.id===alId);
+          const d = await api(`https://api.spotify.com/v1/albums/${alId}/tracks?limit=50`);
+          const items = (d.items||[]).map(t=>({...t, duration_ms: t.duration_ms||0, album:{images:al?.images||[],name:al?.name||''}, uri:t.uri}));
+          pool.push(...items);
+        }
+      }
+
+      pool = pool.filter(t=>t.duration_ms>0 && t.uri).sort(()=>Math.random()-.5);
+      pools.push({ pool, w:a.w, budget: (a.w/totalW)*targetMs, used:0, idx:0 });
+    }
+
+    // Fill proportionally
+    let result=[], totalMs=0, go=true;
+    while (totalMs < targetMs && go) {
+      go = false;
+      for (const p of pools) {
+        if (p.used >= p.budget || p.idx >= p.pool.length) continue;
+        const t = p.pool[p.idx++];
+        result.push(t);
+        p.used += t.duration_ms;
+        totalMs += t.duration_ms;
+        go = true;
+        if (totalMs >= targetMs) break;
+      }
+    }
+
+    tracks = result.sort(()=>Math.random()-.5);
+    renderTracks();
+    clr('genMsg');
+    document.getElementById('tSection').style.display = 'block';
+    document.getElementById('tSection').scrollIntoView({behavior:'smooth',block:'nearest'});
+  } catch(e) {
+    console.error(e);
+    msg('genMsg','err','Erreur : ' + e.message);
+  }
+  document.getElementById('genBtn').disabled = false;
+}
+
+function renderTracks() {
+  const list = document.getElementById('tList');
+  list.innerHTML = '';
+  tracks.forEach((t,i) => {
+    const img = t.album?.images?.[2]?.url||t.album?.images?.[0]?.url||'';
+    const dur = t.duration_ms ? fmt(t.duration_ms) : '';
+    const li = document.createElement('li');
+    li.className = 't-item';
+    li.style.animationDelay = i*20+'ms';
+    li.innerHTML = `
+      <span class="t-num">${i+1}</span>
+      <img class="t-img" src="${img}" alt="" onerror="this.style.background='var(--surface2)'">
+      <div class="t-info">
+        <div class="t-name">${x(t.name)}</div>
+        <div class="t-art">${(t.artists||[]).map(a=>x(a.name)).join(', ')}</div>
+      </div>
+      <span class="t-dur">${dur}</span>
+      <button class="t-del" onclick="delTrack(${i})">✕</button>`;
+    list.appendChild(li);
+  });
+  updTotal();
+}
+
+function delTrack(i) { tracks.splice(i,1); renderTracks(); }
+
+function updTotal() {
+  const ms = tracks.reduce((s,t)=>s+(t.duration_ms||0),0);
+  const el = document.getElementById('durTotal');
+  if (el) el.textContent = `${tracks.length} titres · ${fmt(ms)}`;
+}
+
+// ============================================================
+// SAVE
+// ============================================================
+async function savePlaylist() {
+  await ensureToken();
+  const name = document.getElementById('plName').value.trim() || 'Ma Playlist Générée';
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  msg('genMsg','load','Création de la playlist...',true);
+  try {
+    const pl = await api(`https://api.spotify.com/v1/users/${uid}/playlists`, {
+      method:'POST', body:JSON.stringify({name, description:'Générée par Playlistify', public:true})
+    });
+    const uris = tracks.map(t=>t.uri).filter(Boolean);
+    for (let i=0; i<uris.length; i+=100) {
+      await api(`https://api.spotify.com/v1/playlists/${pl.id}/tracks`, {
+        method:'POST', body:JSON.stringify({uris:uris.slice(i,i+100)})
+      });
+    }
+    clr('genMsg');
+    document.getElementById('mainCard').style.display = 'none';
+    document.getElementById('spLink').href = pl.external_urls.spotify;
+    document.getElementById('resultCard').style.display = 'block';
+    document.getElementById('resultCard').scrollIntoView({behavior:'smooth'});
+  } catch(e) {
+    msg('genMsg','err','Erreur sauvegarde.');
+    btn.disabled = false;
+  }
+}
+
+function reset() {
+  document.getElementById('resultCard').style.display='none';
+  document.getElementById('mainCard').style.display='block';
+  document.getElementById('tSection').style.display='none';
+  tracks=[];
+  document.getElementById('saveBtn').disabled=false;
+}
+
+// ============================================================
+// UTILS
+// ============================================================
+async function api(url, opts={}) {
+  const r = await fetch(url, { ...opts, headers:{ Authorization:'Bearer '+token, 'Content-Type':'application/json', ...(opts.headers||{}) } });
+  if (r.status===401) { const ok=await doRefresh(); if(ok) return api(url,opts); throw new Error('Token expiré'); }
+  if (!r.ok) { const e=await r.json().catch(()=>{}); throw new Error(e?.error?.message||r.status); }
+  return r.json();
+}
+function fmt(ms) { const s=Math.floor(ms/1000),m=Math.floor(s/60),h=Math.floor(m/60); return h?`${h}h${String(m%60).padStart(2,'0')}`:`${m}:${String(s%60).padStart(2,'0')}`; }
+function updDur() { const v=+document.getElementById('dur').value,h=Math.floor(v/60),m=v%60; document.getElementById('durVal').textContent=h?`${h}h${m?m+'min':''}`:`${v} min`; }
+function msg(id,type,text,pulse=false) { document.getElementById(id).innerHTML=`<div class="msg ${type}"><div class="dot${pulse?' pulse':''}"></div><span>${text}</span></div>`; }
+function clr(id) { document.getElementById(id).innerHTML=''; }
+function x(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function ss(k,v) { sessionStorage.setItem('pl_'+k,v); }
+function gs(k) { return sessionStorage.getItem('pl_'+k)||''; }
+
+// ============================================================
+// INIT
+// ============================================================
+(async()=>{
+  if (location.search.includes('code=')) { await handleCode(); }
+  else { await trySession(); }
+})();
+</script>
+</body>
+</html>
